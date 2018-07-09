@@ -342,32 +342,41 @@
 			uvm_analysis_export #(bus_seq_item)sb_export_after;
 
 			uvm_analysis_export #(GPIO_seq_item) GPIO_dut_out_tx_port;
-
+			uvm_tlm_analysis_fifo #(GPIO_seq_item) comparator_output;
 
 			uvm_tlm_analysis_fifo #(bus_seq_item) before_fifo;
 			uvm_tlm_analysis_fifo #(bus_seq_item) after_fifo;
 
+
+
 			 //bus_seq_item req;//eredeti
 			bus_seq_item tr_before;
 			bus_seq_item tr_after;
+			GPIO_seq_item comp_out_item;
 
 			function new(string name, uvm_component parent);//ez csak sablon? vagy igy mar ready?
 			  super.new(name, parent);
 			  tr_before = new("tr_before");
 			  tr_after = new("tr_after");
+			  comp_out_item = new("comp_out_item");
 			endfunction : new
 			   
 			function void build_phase(uvm_phase phase);
 			  super.build_phase(phase);
 			  sb_export_before = new("sb_export_before",this);
 			  sb_export_after  = new("sb_export_after",this);
+
+			  GPIO_dut_out_tx_port = new("GPIO_dut_out_tx_port",this);
+
 			  before_fifo      = new("before_fifo",this); 
 			  after_fifo       = new("after_fifo",this);
+			  comparator_output       = new("comparator_output",this);
 			endfunction : build_phase
 
 			function void connect_phase(uvm_phase phase);
-			      sb_export_before.connect(before_fifo.analysis_export);
-			      sb_export_after.connect(after_fifo.analysis_export);
+			    sb_export_before.connect(before_fifo.analysis_export);
+			    sb_export_after.connect(after_fifo.analysis_export);
+				GPIO_dut_out_tx_port.connect(comparator_output.analysis_export);
 			endfunction: connect_phase    
 
 			    //ez nem tudom, hogy hova jojjon:
@@ -376,6 +385,7 @@
 			      forever begin
 			        before_fifo.get(tr_before);
 			        after_fifo.get(tr_after);
+			        comparator_output.get(comp_out_item);
 				//compare();
 				if(tr_before.compare(tr_after))begin
 					//match++;
