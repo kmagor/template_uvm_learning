@@ -131,7 +131,7 @@
 
 			uvm_analysis_port #(bus_seq_item) d_item_collected_port; //analizis portokat at kelll majd gondolni
 
-			virtual bus_if BUS;
+			virtual bus_if BUS_agnt_vi;
 
 			function new(string name = "bidirect_bus_driver", uvm_component parent );
 			  super.new(name, parent);
@@ -141,32 +141,32 @@
 			task run_phase(uvm_phase phase);
 
 			  // Default conditions:
-			  BUS.valid <= 0;
-			  BUS.rnw <= 1;
+			  BUS_agnt_vi.valid <= 0;
+			  BUS_agnt_vi.rnw <= 1;
 			  // Wait for reset to end
-			  @(posedge BUS.resetn);
+			  @(posedge BUS_agnt_vi.resetn);
 			  forever
 			    begin
 			      seq_item_port.get_next_item(req); // Start processing req item
 			      repeat(req.delay) begin
-			        @(posedge BUS.clk);
+			        @(posedge BUS_agnt_vi.clk);
 			      end
-			      BUS.valid <= 1;
-			      BUS.addr <= req.addr;
-			      BUS.rnw <= req.read_not_write;
+			      BUS_agnt_vi.valid <= 1;
+			      BUS_agnt_vi.addr <= req.addr;
+			      BUS_agnt_vi.rnw <= req.read_not_write;
 			      if(req.read_not_write == 0) begin
-			        BUS.write_data <= req.write_data;
+			        BUS_agnt_vi.write_data <= req.write_data;
 			      end
-			      while(BUS.ready != 1) begin
-			        @(posedge BUS.clk);
+			      while(BUS_agnt_vi.ready != 1) begin
+			        @(posedge BUS_agnt_vi.clk);
 			      end
 			      // At end of the pin level bus transaction
 			      // Copy response data into the req fields:
 			      if(req.read_not_write == 1) begin
-			        req.read_data = BUS.read_data; // If read - copy returned read data
+			        req.read_data = BUS_agnt_vi.read_data; // If read - copy returned read data
 			      end
-			      req.error = BUS.error; // Copy bus error status
-			      BUS.valid <= 0; // End the pin level bus transaction
+			      req.error = BUS_agnt_vi.error; // Copy bus error status
+			      BUS_agnt_vi.valid <= 0; // End the pin level bus transaction
 			      d_item_collected_port.write(req); 
 			      seq_item_port.item_done(); // End of req item
 				`uvm_info("driver side", req.convert2string(), UVM_LOW);
@@ -180,7 +180,7 @@
 		class mye_momnitor extends uvm_monitor;
 			`uvm_component_utils(mye_momnitor)
 			bus_seq_item req;
-			virtual bus_if BUS;
+			virtual bus_if BUS_agnt_vi;
 
 			uvm_analysis_port #(bus_seq_item) item_collected_port; //analizis portokat at kelll majd gondolni
 
@@ -206,15 +206,15 @@
 					logic[31:0] read_data;
 				*/
 				  forever begin
-				      @(posedge BUS.ready);
+				      @(posedge BUS_agnt_vi.ready);
 				    req = bus_seq_item::type_id::create ("req", this);
-				      req.error = BUS.error;
-				      req.addr = BUS.addr; // get address
-				     if(BUS.rnw)  begin // is it a write?
-				         req.read_data = BUS.read_data;  // get data   
+				      req.error = BUS_agnt_vi.error;
+				      req.addr = BUS_agnt_vi.addr; // get address
+				     if(BUS_agnt_vi.rnw)  begin // is it a write?
+				         req.read_data = BUS_agnt_vi.read_data;  // get data   
 					 req.read_not_write = 1; // set op type
 				      end else begin
-				         req.write_data = BUS.write_data;  // get data
+				         req.write_data = BUS_agnt_vi.write_data;  // get data
 					 req.read_not_write = 0; // set op type
 				      end
 				 $display("Following goes to analysis port:");
@@ -332,6 +332,39 @@
 		endclass: bus_seq
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+//////CONFIG PART//////////////////////////////////////////////////////////////////////////////////////////////
+		class bus_agent_config extends uvm_object;
+			`uvm_object_utils(bus_agent_config)
+			function new(string name = "bus_agent_config");
+     				super.new(name);
+  			endfunction: new
+  			uvm_active_passive_enum active = UVM_ACTIVE;	
+			
+			virtual bus_if BUS_agnt_vi;	
+		endclass: bus_agent_config
+
+		class env_conf extends uvm_object;
+			`uvm_object_utils(env_conf)
+			//bit enable_scoreboard = 1;
+			//bit enable_coverage = 1;
+			function new(string name = "env_conf");
+    			super.new(name);
+  			endfunction: new
+			bus_agent_config bus_agt_cfg; 
+			//GPIO_agent_config GPIO_agt_cfg; //ez a majdani GPIO agentem configja	   			
+		endclass: env_conf
+
+		/*class GPIO_agent_config extends  uvm_object;
+			`uvm_object_utils(GPIO_agent_config)
+			//constructor missing
+			//VIRTUAL INTERFACE
+			//virtual GPIO_if GPIO_agnt_vi;
+			//ACTIVENESS
+			uvm_active_passive_enum active = UVM_ACTIVE;			
+		endclass: GPIO_agent_config
+		*/
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// AGENT:
 		class agent_my extends  uvm_agent;
@@ -340,78 +373,121 @@
 				super.new(name, parent);
 			endfunction
 			
-			bus_seq_item req;
+			bus_agent_config bus_agent_configur; //HIBA
 			bidirect_bus_driver m_driver;
 			mye_momnitor m_monitor;
 			bidirect_bus_sequencer m_sequencer;	
 
-			uvm_analysis_port #(bus_seq_item) dut_in_tx_port; //analizis portokat at kelll majd gondolni
-			uvm_analysis_port #(bus_seq_item) dut_out_tx_port; //analizis portokat at kelll majd gondolni			
-			//uvm_sequencer #(bus_seq_item) sqr; //never extended
-			virtual bus_if BUS;
+			uvm_analysis_port #(bus_seq_item) dut_in_tx_port; 
+			uvm_analysis_port #(bus_seq_item) dut_out_tx_port; 
 
 			function void build_phase(uvm_phase phase);
-				m_driver = bidirect_bus_driver::type_id::create("m_driver", this);
-				//m_sequencer = bidirect_bus_sequencer::type_id::create("m_sequencer", this);
-				m_sequencer = new("m_sequencer", this); //no factory
+				if (!uvm_config_db#(bus_agent_config)::get(this, "", "bus_agent_config", bus_agent_configur)) //HIBA
+      				`uvm_fatal("opb_master_agent", "opb_master_agent config not found")
+		
 				m_monitor = mye_momnitor::type_id::create("m_monitor", this);
+				
+				if (bus_agent_configur.active == UVM_ACTIVE) begin
+					//aktivitas allitas
+					m_driver = bidirect_bus_driver::type_id::create("m_driver", this);
+					m_sequencer = new("m_sequencer", this); //no factory			
+				end
 				dut_in_tx_port = new("dut_in_tx_port", this);
 				dut_out_tx_port = new("dut_out_tx_port", this);
 			endfunction : build_phase
 
 			//inner connections: only inside of the agent
 			function void connect_phase(uvm_phase phase); //VIRTUAL?
-				m_driver.seq_item_port.connect(m_sequencer.seq_item_export); //DONE
+				
 				m_monitor.dut_out_tx_port.connect(this.dut_out_tx_port);
 				m_monitor.dut_in_tx_port.connect(this.dut_in_tx_port);
 				
-
-				  if (!uvm_config_db #(virtual bus_if)::get(this, "", "BUS_vif", m_driver.BUS))
+				/*if (!uvm_config_db #(virtual bus_if)::get(this, "", "BUS_vif", m_driver.BUS))
 				    `uvm_error("connect_phase", "uvm_config_db #(virtual bus_if)::get(...) failed");
-				  if (!uvm_config_db #(virtual bus_if)::get(this, "", "BUS_vif", m_monitor.BUS))          ////##### ezt adtam hozza
-				    `uvm_error("connect_phase", "uvm_config_db #(virtual bus_if)::get(...) failed");      ////##### ezt adtam hozza
+				  if (!uvm_config_db #(virtual bus_if)::get(this, "", "BUS_vif", m_monitor.BUS))      
+				    `uvm_error("connect_phase", "uvm_config_db #(virtual bus_if)::get(...) failed");
+				*/
+
+				m_monitor.BUS_agnt_vi = bus_agent_configur.BUS_agnt_vi;
+
+			    if (bus_agent_configur.active == UVM_ACTIVE) begin
+			    	m_driver.seq_item_port.connect(m_sequencer.seq_item_export); //DONE
+			    	m_driver.BUS_agnt_vi = bus_agent_configur.BUS_agnt_vi;
+			    end
 			endfunction
 		endclass : agent_my
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// ENVIRONMENT:
-		class env_my extends  uvm_agent;
+		class env_my extends  uvm_env;
 			`uvm_component_utils(env_my)
 			function new(string name, uvm_component parent);
 				super.new(name, parent);
 			endfunction
-			mye_scoreboard m_scoreboard;     ////##### ezt adtam hozza
+			mye_scoreboard m_scoreboard;     
+			env_conf m_env_config; // 1) deklaralunk egy ures objectet //HIBA
 			agent_my agt;
 
 			function void build_phase(uvm_phase phase);
 					agt = agent_my::type_id::create("agt", this);
+					// 2) az ures objektet tartalommal toltjuk fel a DB-bol
+					if (!uvm_config_db #(env_conf)::get(this, "m_env_config", "env_conf", m_env_config)) //HIBA
+				    `uvm_error("connect_phase", "uvm_config_db #(virtual env_conf)::get(...) failed");
+					// 3) hozzaadni set-tel egy altalanos agent config objectet
+					// 4) Ezt osszekotni a frissen deklaralt ures obj sablonbol keszitett agent peldannyal
+					uvm_config_db #(bus_agent_config)::set(this, "agt", "bus_agent_config", m_env_config.bus_agt_cfg);
+										
+
 					m_scoreboard = mye_scoreboard::type_id::create("m_scoreboard", this);
+
 			endfunction : build_phase
 
-function void connect_phase(uvm_phase phase); //VIRTUAL?
-					m_monitor.item_collected_port.connect(m_scoreboard.sb_export_after);
-					m_driver.d_item_collected_port.connect(m_scoreboard.sb_export_before);
-endfunction
-
-
-
+			function void connect_phase(uvm_phase phase); //VIRTUAL?
+					agt.m_monitor.item_collected_port.connect(m_scoreboard.sb_export_after);
+					agt.m_driver.d_item_collected_port.connect(m_scoreboard.sb_export_before);
+			endfunction
 		endclass : env_my
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		
+
+
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// TEST class which instantiates, builds and connects the sequencer and the driver
 		class bidirect_bus_test extends uvm_test;
-
 			`uvm_component_utils(bidirect_bus_test)
 			function new(string name = "bidirect_bus_test", uvm_component parent = null);
 			  super.new(name, parent);
 			endfunction
+			
+			env_my env; //env
+			env_conf m_env_config; //env conf obj
 
-			env_my env;
+			bus_agent_config bus_agt_cfg; //agt conf obj
+
 			function void build_phase(uvm_phase phase);
 				env = env_my::type_id::create("env", this);
+
+				m_env_config = env_conf::type_id::create("m_env_config");
+
+				/*BUS AGENT*/
+				bus_agt_cfg = bus_agent_config::type_id::create("bus_agt_cfg");
+				/*CONFIGURE*/
+				//configure_agent(bus_agt_cfg);
+				/*SET VIF*/ //?: BUS_agnt_vi neven adjuk at?
+				if (!uvm_config_db#(virtual bus_if)::get(this, "", "BUS_agnt_vif", bus_agt_cfg.BUS_agnt_vi))
+
+			      `uvm_fatal("Config fatal", "Can't get BUS_agnt_vi interface");
+			    /* Set handle in env config */
+			    m_env_config.bus_agt_cfg = bus_agt_cfg;
+				/* Set env config object to config_db */
+				uvm_config_db#(env_conf)::set(this, "env.m_env_config", "env_conf", m_env_config);
+				
 			endfunction : build_phase
+
+			/*function void configure_agent(bus_agt_cfg ref_bus_agt_cfg = null);			    
+			    ref_bus_agt_cfg.active = UVM_ACTIVE;			   
+			endfunction*/
 
 			task run_phase(uvm_phase phase);
 			bus_seq test_seq;
@@ -420,6 +496,7 @@ endfunction
 			  test_seq.start(env.agt.m_sequencer);
 			  phase.drop_objection(this, "Finished test_seq");
 			endtask: run_phase
+
 		endclass: bidirect_bus_test
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	endpackage: bidirect_bus_pkg
@@ -569,7 +646,7 @@ endfunction
 		// UVM start up:
 		initial
 		  begin
-		    uvm_config_db #(virtual bus_if)::set(null, "*", "BUS_vif" , BUS);
+		    uvm_config_db #(virtual bus_if)::set(null, "uvm_test_top", "BUS_agnt_vif" , BUS);
 		    run_test("bidirect_bus_test");
 		  end
 	endmodule: top_tb
