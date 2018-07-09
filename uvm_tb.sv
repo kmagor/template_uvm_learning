@@ -341,10 +341,8 @@
 			endfunction
 			
 			bus_seq_item req;
-
 			bidirect_bus_driver m_driver;
 			mye_momnitor m_monitor;
-			mye_scoreboard m_scoreboard;     ////##### ezt adtam hozza
 			bidirect_bus_sequencer m_sequencer;	
 
 			uvm_analysis_port #(bus_seq_item) dut_in_tx_port; //analizis portokat at kelll majd gondolni
@@ -357,16 +355,12 @@
 				//m_sequencer = bidirect_bus_sequencer::type_id::create("m_sequencer", this);
 				m_sequencer = new("m_sequencer", this); //no factory
 				m_monitor = mye_momnitor::type_id::create("m_monitor", this);
-				m_scoreboard = mye_scoreboard::type_id::create("m_scoreboard", this);
 				dut_in_tx_port = new("dut_in_tx_port", this);
 				dut_out_tx_port = new("dut_out_tx_port", this);
 			endfunction : build_phase
 
 			//inner connections: only inside of the agent
 			function void connect_phase(uvm_phase phase); //VIRTUAL?
-				//m_driver.seq_item_port.connect(sqr.seq_item_export);
-				m_monitor.item_collected_port.connect(m_scoreboard.sb_export_after);
-				m_driver.d_item_collected_port.connect(m_scoreboard.sb_export_before);
 				m_driver.seq_item_port.connect(m_sequencer.seq_item_export); //DONE
 				m_monitor.dut_out_tx_port.connect(this.dut_out_tx_port);
 				m_monitor.dut_in_tx_port.connect(this.dut_in_tx_port);
@@ -387,12 +381,21 @@
 			function new(string name, uvm_component parent);
 				super.new(name, parent);
 			endfunction
-
+			mye_scoreboard m_scoreboard;     ////##### ezt adtam hozza
 			agent_my agt;
 
 			function void build_phase(uvm_phase phase);
 					agt = agent_my::type_id::create("agt", this);
+					m_scoreboard = mye_scoreboard::type_id::create("m_scoreboard", this);
 			endfunction : build_phase
+
+function void connect_phase(uvm_phase phase); //VIRTUAL?
+					m_monitor.item_collected_port.connect(m_scoreboard.sb_export_after);
+					m_driver.d_item_collected_port.connect(m_scoreboard.sb_export_before);
+endfunction
+
+
+
 		endclass : env_my
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		
@@ -406,7 +409,6 @@
 			endfunction
 
 			env_my env;
-			//bus_seq test_seq;
 			function void build_phase(uvm_phase phase);
 				env = env_my::type_id::create("env", this);
 			endfunction : build_phase
