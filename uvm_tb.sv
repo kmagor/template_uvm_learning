@@ -289,6 +289,36 @@
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		// GPIO MONITOR:
+		class GPIO_momnitor extends uvm_monitor;
+			`uvm_component_utils(GPIO_momnitor)
+			GPIO_seq_item req;
+			virtual gpio_if GPIO_agnt_vi;
+			uvm_analysis_port #(GPIO_seq_item) GPIO_dut_out_tx_port; //analizis portokat at kelll majd gondolni
+
+			function new(string name = "GPIO_momnitor", uvm_component parent);
+			  super.new(name, parent);
+			  GPIO_dut_out_tx_port = new("GPIO_dut_out_tx_port", this);
+			endfunction
+
+			task run_phase(uvm_phase phase);
+				  forever begin
+				      @(posedge GPIO_agnt_vi.gp_op_valid);
+				    req = GPIO_seq_item::type_id::create ("req", this);
+				     if(GPIO_agnt_vi.gp_op_valid)  begin // is it a valid output?
+				         req.gp_op = GPIO_agnt_vi.gp_op;  // get data   
+				         req.gp_ip = GPIO_agnt_vi.gp_ip;  // get data   					 
+				      end
+
+				 $display("Following goes to analysis port FROM GPIO_momnitor:");
+				`uvm_info("GPIO monitor side", req.convert2string(), UVM_LOW);
+				      GPIO_dut_out_tx_port.write(req); 				
+				end			    
+			endtask: run_phase
+		endclass: GPIO_momnitor
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// Bus SequenceR:
 		class bidirect_bus_sequencer extends uvm_sequencer #(bus_seq_item);
 
@@ -311,13 +341,15 @@
 			uvm_analysis_export #(bus_seq_item)sb_export_before;
 			uvm_analysis_export #(bus_seq_item)sb_export_after;
 
+			uvm_analysis_export #(GPIO_seq_item) GPIO_dut_out_tx_port;
+
+
 			uvm_tlm_analysis_fifo #(bus_seq_item) before_fifo;
 			uvm_tlm_analysis_fifo #(bus_seq_item) after_fifo;
 
 			 //bus_seq_item req;//eredeti
 			bus_seq_item tr_before;
 			bus_seq_item tr_after;
-
 
 			function new(string name, uvm_component parent);//ez csak sablon? vagy igy mar ready?
 			  super.new(name, parent);
@@ -395,16 +427,24 @@
 		endclass: bus_seq
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-//////CONFIG PART//////////////////////////////////////////////////////////////////////////////////////////////
+		//////CONFIG PART//////////////////////////////////////////////////////////////////////////////////////////////
 		class bus_agent_config extends uvm_object;
 			`uvm_object_utils(bus_agent_config)
 			function new(string name = "bus_agent_config");
      				super.new(name);
   			endfunction: new
-  			uvm_active_passive_enum active = UVM_ACTIVE;	
-			
+  			uvm_active_passive_enum active = UVM_ACTIVE;				
 			virtual bus_if BUS_agnt_vi;	
 		endclass: bus_agent_config
+
+		class GPIO_agent_config extends  uvm_object;
+			`uvm_object_utils(GPIO_agent_config)
+			function new(string name = "GPIO_agent_config");
+    			super.new(name);
+  			endfunction: new
+			virtual gpio_if GPIO_agnt_vi;
+			uvm_active_passive_enum active = UVM_PASSIVE;			
+		endclass: GPIO_agent_config
 
 		class env_conf extends uvm_object;
 			`uvm_object_utils(env_conf)
@@ -414,22 +454,41 @@
     			super.new(name);
   			endfunction: new
 			bus_agent_config bus_agt_cfg; 
-			//GPIO_agent_config GPIO_agt_cfg; //ez a majdani GPIO agentem configja	   			
+			GPIO_agent_config GPIO_agent_configur; 	   			
 		endclass: env_conf
-
-		/*class GPIO_agent_config extends  uvm_object;
-			`uvm_object_utils(GPIO_agent_config)
-			//constructor missing
-			//VIRTUAL INTERFACE
-			//virtual GPIO_if GPIO_agnt_vi;
-			//ACTIVENESS
-			uvm_active_passive_enum active = UVM_ACTIVE;			
-		endclass: GPIO_agent_config
-		*/
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-		// AGENT:
+		// GPIO_AGENT:
+		class agent_gpio extends  uvm_agent;
+			`uvm_component_utils(agent_gpio)
+			function new(string name, uvm_component parent);
+				super.new(name, parent);
+			endfunction
+			
+			GPIO_agent_config GPIO_agent_configur; //CHECK IF READY TO IMPLEMENT
+			GPIO_momnitor m_monitor;
+
+			uvm_analysis_port #(GPIO_seq_item) GPIO_dut_out_tx_port; 
+
+			function void build_phase(uvm_phase phase);
+				if (!uvm_config_db#(GPIO_agent_config)::get(this, "", "GPIO_agent_config", GPIO_agent_configur)) 
+      				`uvm_fatal("GPIO_agent", "GPIO_agent config not found")
+		
+				m_monitor = GPIO_momnitor::type_id::create("m_monitor", this);
+				GPIO_dut_out_tx_port = new("GPIO_dut_out_tx_port", this);
+			endfunction : build_phase
+
+			//inner connections: only inside of the agent
+			function void connect_phase(uvm_phase phase); 				
+				m_monitor.GPIO_dut_out_tx_port.connect(this.GPIO_dut_out_tx_port);
+				m_monitor.GPIO_agnt_vi = GPIO_agent_configur.GPIO_agnt_vi;
+			endfunction
+		endclass : agent_gpio
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		// BUS_AGENT:
 		class agent_my extends  uvm_agent;
 			`uvm_component_utils(agent_my)
 			function new(string name, uvm_component parent);
@@ -491,30 +550,31 @@
 			mye_scoreboard m_scoreboard;     
 			env_conf m_env_config; // 1) deklaralunk egy ures objectet //HIBA
 			agent_my agt;
+			agent_gpio gpio_agt;
 
 			function void build_phase(uvm_phase phase);
 					agt = agent_my::type_id::create("agt", this);
+					gpio_agt = agent_gpio::type_id::create("gpio_agt", this);
 					// 2) az ures objektet tartalommal toltjuk fel a DB-bol
 					if (!uvm_config_db #(env_conf)::get(this, "m_env_config", "env_conf", m_env_config)) //HIBA
 				    `uvm_error("connect_phase", "uvm_config_db #(virtual env_conf)::get(...) failed");
 					// 3) hozzaadni set-tel egy altalanos agent config objectet
 					// 4) Ezt osszekotni a frissen deklaralt ures obj sablonbol keszitett agent peldannyal
 					uvm_config_db #(bus_agent_config)::set(this, "agt", "bus_agent_config", m_env_config.bus_agt_cfg);
+					uvm_config_db #(GPIO_agent_config)::set(this, "gpio_agt", "GPIO_agent_config", m_env_config.GPIO_agent_configur);
 										
-
 					m_scoreboard = mye_scoreboard::type_id::create("m_scoreboard", this);
-
 			endfunction : build_phase
 
-			function void connect_phase(uvm_phase phase); //VIRTUAL?
+			function void connect_phase(uvm_phase phase);
 					agt.m_monitor.item_collected_port.connect(m_scoreboard.sb_export_after);
 					agt.m_driver.d_item_collected_port.connect(m_scoreboard.sb_export_before);
+
+					gpio_agt.m_monitor.GPIO_dut_out_tx_port.connect(m_scoreboard.GPIO_dut_out_tx_port);
 			endfunction
 		endclass : env_my
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		
-
-
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// TEST class which instantiates, builds and connects the sequencer and the driver
 		class bidirect_bus_test extends uvm_test;
@@ -527,22 +587,27 @@
 			env_conf m_env_config; //env conf obj
 
 			bus_agent_config bus_agt_cfg; //agt conf obj
+			GPIO_agent_config GPIO_agent_configur;
 
 			function void build_phase(uvm_phase phase);
 				env = env_my::type_id::create("env", this);
 
 				m_env_config = env_conf::type_id::create("m_env_config");
 
-				/*BUS AGENT*/
 				bus_agt_cfg = bus_agent_config::type_id::create("bus_agt_cfg");
+				GPIO_agent_configur = GPIO_agent_config::type_id::create("GPIO_agent_configur");
 				/*CONFIGURE*/
 				//configure_agent(bus_agt_cfg);
 				/*SET VIF*/ //?: BUS_agnt_vi neven adjuk at?
-				if (!uvm_config_db#(virtual bus_if)::get(this, "", "BUS_agnt_vif", bus_agt_cfg.BUS_agnt_vi))
 
+				if (!uvm_config_db#(virtual bus_if)::get(this, "", "BUS_agnt_vif", bus_agt_cfg.BUS_agnt_vi))
 			      `uvm_fatal("Config fatal", "Can't get BUS_agnt_vi interface");
+			    if (!uvm_config_db#(virtual gpio_if)::get(this, "", "GPIO_agnt_vif", GPIO_agent_configur.GPIO_agnt_vi))
+			      `uvm_fatal("Config fatal", "Can't get GPIO_agnt_vi interface");
+
 			    /* Set handle in env config */
 			    m_env_config.bus_agt_cfg = bus_agt_cfg;
+			    m_env_config.GPIO_agent_configur = GPIO_agent_configur;
 				/* Set env config object to config_db */
 				uvm_config_db#(env_conf)::set(this, "env.m_env_config", "env_conf", m_env_config);
 				
@@ -559,7 +624,6 @@
 			  test_seq.start(env.agt.m_sequencer);
 			  phase.drop_objection(this, "Finished test_seq");
 			endtask: run_phase
-
 		endclass: bidirect_bus_test
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	endpackage: bidirect_bus_pkg
@@ -568,7 +632,6 @@
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Interfaces for the bus and the DUT GPIO output
 	interface bus_if;
-
 		logic clk;
 		logic resetn;
 		logic[31:0] addr;
@@ -710,6 +773,7 @@
 		initial
 		  begin
 		    uvm_config_db #(virtual bus_if)::set(null, "uvm_test_top", "BUS_agnt_vif" , BUS);
+		    uvm_config_db #(virtual gpio_if)::set(null, "uvm_test_top", "GPIO_agnt_vif" , GPIO);
 		    run_test("bidirect_bus_test");
 		  end
 	endmodule: top_tb
