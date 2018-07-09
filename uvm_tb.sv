@@ -35,6 +35,69 @@
 		`include "uvm_macros.svh"
 
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		// GPIO sequence item
+		class GPIO_seq_item extends uvm_sequence_item;
+
+			logic[7:0]   gp_op_valid;        
+			logic[255:0] gp_op;
+			logic[255:0] gp_ip;
+
+			`uvm_object_utils(GPIO_seq_item)
+
+			function new(string name = "GPIO_seq_item");
+			  super.new(name);
+			endfunction
+			//constraint at_least_1 { delay inside {[1:20]};} ????
+			//constraint align_32 {addr[1:0] == 0;} ????
+			function void do_copy(uvm_object rhs);
+			  GPIO_seq_item rhs_;
+
+			  if(!$cast(rhs_, rhs)) begin
+			    `uvm_error("do_copy", "cast failed, check types");
+			  end
+			  gp_op_valid = rhs_.gp_op_valid;
+			  gp_op = rhs_.gp_op;
+			  gp_ip = rhs_.gp_ip;
+			endfunction: do_copy
+
+			function bit do_compare(uvm_object rhs, uvm_comparer comparer);
+			  GPIO_seq_item rhs_;
+
+			  do_compare = $cast(rhs_, rhs) &&
+			               super.do_compare(rhs, comparer) &&
+			               gp_op_valid		===	rhs_.gp_op_valid &&
+			               gp_op 	=== 	rhs_.gp_op &&
+			               gp_ip 	===	rhs_.gp_ip;
+			endfunction: do_compare
+
+			function string convert2string();
+			  return $sformatf("%s\n gp_op_valid:\t%0h\n gp_op:\t%0h\n gp_ip:\t%0b\n",
+			                    super.convert2string(), gp_op_valid, gp_op, gp_ip);
+			endfunction: convert2string
+
+			function void do_print(uvm_printer printer);
+
+			  if(printer.knobs.sprint == 0) begin
+			    $display(convert2string());
+			  end
+			  else begin
+			    printer.m_string = convert2string();
+			  end
+
+			endfunction: do_print
+
+			function void do_record(uvm_recorder recorder);
+			  super.do_record(recorder);
+
+			  `uvm_record_field("gp_op_valid", gp_op_valid);
+			  `uvm_record_field("gp_op", gp_op);
+			  `uvm_record_field("gp_ip", gp_ip);
+
+			endfunction: do_record
+		endclass: GPIO_seq_item
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// Bus sequence item
 		class bus_seq_item extends uvm_sequence_item;
 
