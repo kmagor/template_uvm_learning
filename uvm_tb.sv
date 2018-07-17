@@ -334,23 +334,23 @@
 		class my_predictor extends uvm_subscriber #(bus_seq_item);
 			uvm_analysis_port #(GPIO_seq_item) expected_port;
 
-		function void build_phase(uvm_phase phase);
-			expected_port = new("expected_port", this);
-		endfunction  
+			function void build_phase(uvm_phase phase);
+				expected_port = new("expected_port", this);
+			endfunction  
 
-		function void write(input bus_seq_item t);
-			bus_seq_item expected_txn;
-			if($cast(expected_txn, t.clone())) `uvm_fatal("COW fatal", "Can't copy sequence item in predictor") //COPY ON WRITE
-		/*
-		case(t.opcode) //calculate and save expected results
-			//here logic needed to represent the behaviour of the dut
-			ADD: expected_txn.result = t.a + t.b; 
-			SUB: expected_txn.result = t.a - t.b;
-			//...
-		endcase // t.opcode
-		*/
-		expected_port.write(expected_txn); //send expected results to the evaluuator
-	endfunction  
+			function void write(input bus_seq_item t);
+				bus_seq_item expected_txn;
+				if($cast(expected_txn, t.clone())) `uvm_fatal("COW fatal", "Can't copy sequence item in predictor") //COPY ON WRITE
+			/*
+			case(t.opcode) //calculate and save expected results
+				//here logic needed to represent the behaviour of the dut
+				ADD: expected_txn.result = t.a + t.b; 
+				SUB: expected_txn.result = t.a - t.b;
+				//...
+			endcase // t.opcode
+			*/
+//			expected_port.write(expected_txn); //send expected results to the evaluuator
+		endfunction  
 
 		endclass : my_predictor	
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -418,8 +418,6 @@
 
 			uvm_tlm_analysis_fifo #(bus_seq_item) before_fifo;
 			uvm_tlm_analysis_fifo #(bus_seq_item) after_fifo;
-
-
 
 			 //bus_seq_item req;//eredeti
 			bus_seq_item tr_before;
