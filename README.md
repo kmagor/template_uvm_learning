@@ -8,7 +8,7 @@ This is a simple DUT and for that a UVM testbench.
 4: + Environment
 5: + Configuration objects
 
-2. Part:
-1: + GPIO_seq_item
-2: + Passive agent for GPIO
-3: + Predictor and Comparator logic
+2. Part (Partly Done):
+1: + GPIO_seq_item (DONE)
+2: + Passive agent for GPIO (DONE)
+3: + Predictor and Comparator logic (NOT DONE)
