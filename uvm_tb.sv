@@ -38,7 +38,7 @@
 		// GPIO sequence item
 		class GPIO_seq_item extends uvm_sequence_item;
 
-			logic[7:0]   gp_op_valid;        
+			logic[7:0]   gp_op_valid;
 			logic[255:0] gp_op;
 			logic[255:0] gp_ip;
 
@@ -329,10 +329,82 @@
 			endfunction
 		endclass: bidirect_bus_sequencer
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-		
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		// Predictor:	
+		class my_predictor extends uvm_subscriber #(bus_seq_item);
+			uvm_analysis_port #(GPIO_seq_item) expected_port;
+
+		function void build_phase(uvm_phase phase);
+			expected_port = new("expected_port", this);
+		endfunction  
+
+		function void write(input bus_seq_item t);
+			bus_seq_item expected_txn;
+			if($cast(expected_txn, t.clone())) `uvm_fatal("COW fatal", "Can't copy sequence item in predictor") //COPY ON WRITE
+		/*
+		case(t.opcode) //calculate and save expected results
+			//here logic needed to represent the behaviour of the dut
+			ADD: expected_txn.result = t.a + t.b; 
+			SUB: expected_txn.result = t.a - t.b;
+			//...
+		endcase // t.opcode
+		*/
+		expected_port.write(expected_txn); //send expected results to the evaluuator
+	endfunction  
+
+		endclass : my_predictor	
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		// Evaluator or Comparator:		
+		class my_evaluator extends uvm_component /* base class*/;
+			//Factory registration and construstor
+			`uvm_component_utils(my_evaluator)
+			function new(string name, uvm_component parent);
+    			super.new(name, parent);
+  			endfunction
+			uvm_analysis_export #(GPIO_seq_item) expected_export;
+			uvm_tlm_analysis_fifo #(GPIO_seq_item) expected_fifo;
+
+			uvm_analysis_export #(GPIO_seq_item) actual_export;
+			uvm_tlm_analysis_fifo #(GPIO_seq_item) actual_fifo;
+
+			int match, mismatch;
+
+			function void build_phase(uvm_phase phase);
+				expected_fifo		= new("expected_fifo",this);
+				expected_export		= new("expected_export",this);
+				actual_fifo			= new("actual_fifo",this);
+				actual_export		= new("actual_export",this);
+			endfunction
+
+			virtual function void connect_phase(uvm_phase phase);
+				expected_export.connect(expected_fifo.analysis_export);
+				actual_export.connect(actual_fifo.analysis_export);
+			endfunction
+
+			virtual task run_phase(uvm_phase phase);
+				GPIO_seq_item expected_txn, actual_txn;
+				forever begin
+					expected_fifo.get(expected_txn);
+					actual_fifo.get(actual_txn);
+					if(actual_txn.compare(expected_txn))
+						match++;
+					else begin
+						`uvm_error("Evaluator", $sformatf("%s does not match %s",expected_txn.convert2string(), actual_txn.convert2string()))
+						mismatch++;
+					end // else
+				end // forever
+			endtask : run_phase
+			
+			function void report_phase(uvm_phase phase);
+				`uvm_info("Evaluator", $sformatf("Matched=%0d, mismatch=%0d",match, mismatch), UVM_LOW)	
+			endfunction
+		endclass : my_evaluator
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
  
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-		// Scoreboard:
+		// Flat Scoreboard:
 		class mye_scoreboard extends uvm_scoreboard;
 		 
 			`uvm_component_utils(mye_scoreboard) //reg in the factory done
@@ -396,6 +468,80 @@
 			      end
 			    endtask: run
 		endclass : mye_scoreboard
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		// Hierarchical Scoreboard:
+		class mye_h_scoreboard extends uvm_scoreboard;		 
+			`uvm_component_utils(mye_scoreboard) //reg in the factory done
+
+			my_predictor predictor;
+			my_evaluator evaluator;
+
+			function new(string name, uvm_component parent);
+    			super.new(name, parent);
+  			endfunction
+
+			/*
+			//uvm_analysis_imp#(bus_seq_item, mye_scoreboard) item_collected_export; //eredeti
+			uvm_analysis_export #(bus_seq_item)sb_export_before;
+			uvm_analysis_export #(bus_seq_item)sb_export_after;
+
+			uvm_analysis_export #(GPIO_seq_item) GPIO_dut_out_tx_port;
+			uvm_tlm_analysis_fifo #(GPIO_seq_item) comparator_output;
+
+			uvm_tlm_analysis_fifo #(bus_seq_item) before_fifo;
+			uvm_tlm_analysis_fifo #(bus_seq_item) after_fifo;
+
+
+
+			 //bus_seq_item req;//eredeti
+			bus_seq_item tr_before;
+			bus_seq_item tr_after;
+			GPIO_seq_item comp_out_item;
+
+			function new(string name, uvm_component parent);//ez csak sablon? vagy igy mar ready?
+			  super.new(name, parent);
+			  tr_before = new("tr_before");
+			  tr_after = new("tr_after");
+			  comp_out_item = new("comp_out_item");
+			endfunction : new
+			   
+			function void build_phase(uvm_phase phase);
+			  super.build_phase(phase);
+			  sb_export_before = new("sb_export_before",this);
+			  sb_export_after  = new("sb_export_after",this);
+
+			  GPIO_dut_out_tx_port = new("GPIO_dut_out_tx_port",this);
+
+			  before_fifo      = new("before_fifo",this); 
+			  after_fifo       = new("after_fifo",this);
+			  comparator_output       = new("comparator_output",this);
+			endfunction : build_phase
+
+			function void connect_phase(uvm_phase phase);
+			    sb_export_before.connect(before_fifo.analysis_export);
+			    sb_export_after.connect(after_fifo.analysis_export);
+				GPIO_dut_out_tx_port.connect(comparator_output.analysis_export);
+			endfunction: connect_phase    
+
+			    //ez nem tudom, hogy hova jojjon:
+			    //
+			    task run();
+			      forever begin
+			        before_fifo.get(tr_before);
+			        after_fifo.get(tr_after);
+			        comparator_output.get(comp_out_item);
+				//compare();
+				if(tr_before.compare(tr_after))begin
+					//match++;
+					`uvm_info("ITS A MATCH", $sformatf("%s does match %s", tr_after.convert2string(), tr_before.convert2string()), UVM_LOW);
+				end else begin
+					`uvm_error("Evaluator", $sformatf("%s does not match %s", tr_after.convert2string(), tr_before.convert2string()));
+				end
+			      end
+			    endtask: run*/
+		endclass : mye_h_scoreboard
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
