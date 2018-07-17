@@ -332,6 +332,10 @@
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// Predictor:	
 		class my_predictor extends uvm_subscriber #(bus_seq_item);
+			`uvm_component_utils(my_predictor)
+			function new(string name, uvm_component parent);
+    			super.new(name, parent);
+  			endfunction
 			uvm_analysis_port #(GPIO_seq_item) expected_port;
 
 			function void build_phase(uvm_phase phase);
