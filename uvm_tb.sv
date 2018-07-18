@@ -478,6 +478,8 @@
 			  super.build_phase(phase);
  			//	GPIO_dut_out_tx_port = new("GPIO_dut_out_tx_port",this);
  			//	comparator_output       = new("comparator_output",this);
+ 			predictor = my_predictor::type_id::create("predictor", this);
+ 			evaluator = my_evaluator::type_id::create("evaluator", this);
 			endfunction
 
 			function void connect_phase(uvm_phase phase);
