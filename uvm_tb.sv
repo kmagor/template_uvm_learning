@@ -353,7 +353,7 @@
 				//...
 			endcase // t.opcode
 			*/
-//			expected_port.write(expected_txn); //send expected results to the evaluuator
+		//	expected_port.write(expected_txn); //send expected results to the evaluuator
 		endfunction  
 
 		endclass : my_predictor	
@@ -409,48 +409,34 @@
  
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// Flat Scoreboard:
-		class mye_scoreboard extends uvm_scoreboard;
-		 
+		class mye_scoreboard extends uvm_scoreboard;		 
 			`uvm_component_utils(mye_scoreboard) //reg in the factory done
-
-			//uvm_analysis_imp#(bus_seq_item, mye_scoreboard) item_collected_export; //eredeti
 			uvm_analysis_export #(bus_seq_item)sb_export_before;
 			uvm_analysis_export #(bus_seq_item)sb_export_after;
-
-			uvm_analysis_export #(GPIO_seq_item) GPIO_dut_out_tx_port;
-			uvm_tlm_analysis_fifo #(GPIO_seq_item) comparator_output;
-
 			uvm_tlm_analysis_fifo #(bus_seq_item) before_fifo;
 			uvm_tlm_analysis_fifo #(bus_seq_item) after_fifo;
 
 			 //bus_seq_item req;//eredeti
 			bus_seq_item tr_before;
 			bus_seq_item tr_after;
-			GPIO_seq_item comp_out_item;
 
 			function new(string name, uvm_component parent);//ez csak sablon? vagy igy mar ready?
 			  super.new(name, parent);
 			  tr_before = new("tr_before");
 			  tr_after = new("tr_after");
-			  comp_out_item = new("comp_out_item");
 			endfunction : new
 			   
 			function void build_phase(uvm_phase phase);
 			  super.build_phase(phase);
 			  sb_export_before = new("sb_export_before",this);
 			  sb_export_after  = new("sb_export_after",this);
-
-			  GPIO_dut_out_tx_port = new("GPIO_dut_out_tx_port",this);
-
 			  before_fifo      = new("before_fifo",this); 
-			  after_fifo       = new("after_fifo",this);
-			  comparator_output       = new("comparator_output",this);
+			  after_fifo       = new("after_fifo",this);			 
 			endfunction : build_phase
 
 			function void connect_phase(uvm_phase phase);
 			    sb_export_before.connect(before_fifo.analysis_export);
-			    sb_export_after.connect(after_fifo.analysis_export);
-				GPIO_dut_out_tx_port.connect(comparator_output.analysis_export);
+			    sb_export_after.connect(after_fifo.analysis_export);				
 			endfunction: connect_phase    
 
 			    //ez nem tudom, hogy hova jojjon:
@@ -458,15 +444,14 @@
 			    task run();
 			      forever begin
 			        before_fifo.get(tr_before);
-			        after_fifo.get(tr_after);
-			        comparator_output.get(comp_out_item);
-				//compare();
-				if(tr_before.compare(tr_after))begin
-					//match++;
-					`uvm_info("ITS A MATCH", $sformatf("%s does match %s", tr_after.convert2string(), tr_before.convert2string()), UVM_LOW);
-				end else begin
-					`uvm_error("Evaluator", $sformatf("%s does not match %s", tr_after.convert2string(), tr_before.convert2string()));
-				end
+			        after_fifo.get(tr_after);			       
+					//compare();
+					if(tr_before.compare(tr_after))begin
+						//match++;
+						`uvm_info("ITS A MATCH", $sformatf("%s does match %s", tr_after.convert2string(), tr_before.convert2string()), UVM_LOW);
+					end else begin
+						`uvm_error("Evaluator", $sformatf("%s does not match %s", tr_after.convert2string(), tr_before.convert2string()));
+					end
 			      end
 			    endtask: run
 		endclass : mye_scoreboard
@@ -475,16 +460,36 @@
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// Hierarchical Scoreboard:
 		class mye_h_scoreboard extends uvm_scoreboard;		 
-			`uvm_component_utils(mye_scoreboard) //reg in the factory done
+			`uvm_component_utils(mye_h_scoreboard) //reg in the factory done
 
 			my_predictor predictor;
 			my_evaluator evaluator;
+			
+			//uvm_analysis_export #(GPIO_seq_item) GPIO_dut_out_tx_port;
+			//uvm_tlm_analysis_fifo #(GPIO_seq_item) comparator_output;
 
+			//GPIO_seq_item comp_out_item;
 			function new(string name, uvm_component parent);
     			super.new(name, parent);
+    		//	comp_out_item = new("comp_out_item");    			
   			endfunction
 
-			/*
+			function void build_phase(uvm_phase phase);
+			  super.build_phase(phase);
+ 			//	GPIO_dut_out_tx_port = new("GPIO_dut_out_tx_port",this);
+ 			//	comparator_output       = new("comparator_output",this);
+			endfunction
+
+			function void connect_phase(uvm_phase phase);
+			//	GPIO_dut_out_tx_port.connect(comparator_output.analysis_export);
+			endfunction: connect_phase    
+
+				/*task run();
+			    forever begin
+			 	//	comparator_output.get(comp_out_item);
+			 	end
+			    endtask: run*/
+		/*
 			//uvm_analysis_imp#(bus_seq_item, mye_scoreboard) item_collected_export; //eredeti
 			uvm_analysis_export #(bus_seq_item)sb_export_before;
 			uvm_analysis_export #(bus_seq_item)sb_export_after;
@@ -705,7 +710,8 @@
 			function new(string name, uvm_component parent);
 				super.new(name, parent);
 			endfunction
-			mye_scoreboard m_scoreboard;     
+			mye_scoreboard m_scoreboard;
+			mye_h_scoreboard m_h_scoreboard;     
 			env_conf m_env_config; // 1) deklaralunk egy ures objectet //HIBA
 			agent_my agt;
 			agent_gpio gpio_agt;
@@ -722,13 +728,14 @@
 					uvm_config_db #(GPIO_agent_config)::set(this, "gpio_agt", "GPIO_agent_config", m_env_config.GPIO_agent_configur);
 										
 					m_scoreboard = mye_scoreboard::type_id::create("m_scoreboard", this);
+					m_h_scoreboard = mye_h_scoreboard::type_id::create("m_h_scoreboard", this);
 			endfunction : build_phase
 
 			function void connect_phase(uvm_phase phase);
 					agt.m_monitor.item_collected_port.connect(m_scoreboard.sb_export_after);
 					agt.m_driver.d_item_collected_port.connect(m_scoreboard.sb_export_before);
 
-					gpio_agt.m_monitor.GPIO_dut_out_tx_port.connect(m_scoreboard.GPIO_dut_out_tx_port);
+					//gpio_agt.m_monitor.GPIO_dut_out_tx_port.connect(m_h_scoreboard.GPIO_dut_out_tx_port);
 			endfunction
 		endclass : env_my
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
