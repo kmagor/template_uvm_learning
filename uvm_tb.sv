@@ -353,7 +353,7 @@
 				//...
 			endcase // t.opcode
 			*/
-		//	expected_port.write(expected_txn); //send expected results to the evaluuator
+		//	expected_port.write(expected_txn); //send expected results to the evaluator
 		endfunction  
 
 		endclass : my_predictor	
@@ -465,9 +465,9 @@
 			my_predictor predictor;
 			my_evaluator evaluator;
 			
-			//uvm_analysis_export #(GPIO_seq_item) GPIO_dut_out_tx_port;
+			uvm_analysis_export #(bus_seq_item) dut_in_export;
+			uvm_analysis_export #(GPIO_seq_item) dut_out_export;
 			//uvm_tlm_analysis_fifo #(GPIO_seq_item) comparator_output;
-
 			//GPIO_seq_item comp_out_item;
 			function new(string name, uvm_component parent);
     			super.new(name, parent);
@@ -475,15 +475,20 @@
   			endfunction
 
 			function void build_phase(uvm_phase phase);
-			  super.build_phase(phase);
- 			//	GPIO_dut_out_tx_port = new("GPIO_dut_out_tx_port",this);
- 			//	comparator_output       = new("comparator_output",this);
- 			predictor = my_predictor::type_id::create("predictor", this);
- 			evaluator = my_evaluator::type_id::create("evaluator", this);
+				super.build_phase(phase);
+				dut_in_export = new("dut_in_export", this);
+				dut_out_export = new("dut_out_export", this);
+ 				predictor = my_predictor::type_id::create("predictor", this);
+ 				evaluator = my_evaluator::type_id::create("evaluator", this);
+ 				//	GPIO_dut_out_tx_port = new("GPIO_dut_out_tx_port",this);
+ 				//	comparator_output       = new("comparator_output",this);
 			endfunction
 
 			function void connect_phase(uvm_phase phase);
-			//	GPIO_dut_out_tx_port.connect(comparator_output.analysis_export);
+				dut_in_export.connect(predictor.analysis_export);
+				predictor.expected_port.connect(evaluator.expected_export);
+				dut_out_export.connect(evaluator.actual_export);
+				//	GPIO_dut_out_tx_port.connect(comparator_output.analysis_export);
 			endfunction: connect_phase    
 
 				/*task run();
@@ -736,8 +741,8 @@
 			function void connect_phase(uvm_phase phase);
 					agt.m_monitor.item_collected_port.connect(m_scoreboard.sb_export_after);
 					agt.m_driver.d_item_collected_port.connect(m_scoreboard.sb_export_before);
-
-					//gpio_agt.m_monitor.GPIO_dut_out_tx_port.connect(m_h_scoreboard.GPIO_dut_out_tx_port);
+					agt.m_driver.d_item_collected_port.connect(m_h_scoreboard.dut_in_export);
+					gpio_agt.m_monitor.GPIO_dut_out_tx_port.connect(m_h_scoreboard.dut_out_export);
 			endfunction
 		endclass : env_my
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
