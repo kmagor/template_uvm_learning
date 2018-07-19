@@ -329,6 +329,7 @@
 			endfunction
 		endclass: bidirect_bus_sequencer
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// Predictor:	
 		class my_predictor extends uvm_subscriber #(bus_seq_item);
@@ -336,7 +337,7 @@
 			function new(string name, uvm_component parent);
     			super.new(name, parent);
   			endfunction
-			uvm_analysis_port #(GPIO_seq_item) expected_port;
+			uvm_analysis_port #(bus_seq_item) expected_port;
 
 			function void build_phase(uvm_phase phase);
 				expected_port = new("expected_port", this);
@@ -345,17 +346,17 @@
 			function void write(input bus_seq_item t);
 				bus_seq_item expected_txn;
 				if($cast(expected_txn, t.clone())) `uvm_fatal("COW fatal", "Can't copy sequence item in predictor") //COPY ON WRITE
-			/*
-			case(t.opcode) //calculate and save expected results
-				//here logic needed to represent the behaviour of the dut
-				ADD: expected_txn.result = t.a + t.b; 
-				SUB: expected_txn.result = t.a - t.b;
-				//...
-			endcase // t.opcode
-			*/
-		//	expected_port.write(expected_txn); //send expected results to the evaluator
-		endfunction  
 
+			/*
+				case(t.opcode) //calculate and save expected results
+				//here logic needed to represent the behaviour of the dut
+					ADD: expected_txn.result = t.a + t.b; 
+					SUB: expected_txn.result = t.a - t.b;
+					//...
+				endcase // t.opcode
+				*/
+				expected_port.write(expected_txn); //send expected results to the evaluator
+			endfunction  
 		endclass : my_predictor	
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -450,7 +451,7 @@
 						//match++;
 						`uvm_info("ITS A MATCH", $sformatf("%s does match %s", tr_after.convert2string(), tr_before.convert2string()), UVM_LOW);
 					end else begin
-						`uvm_error("Evaluator", $sformatf("%s does not match %s", tr_after.convert2string(), tr_before.convert2string()));
+						`uvm_error("FLAT_Evaluator", $sformatf("%s does not match %s", tr_after.convert2string(), tr_before.convert2string()));
 					end
 			      end
 			    endtask: run
