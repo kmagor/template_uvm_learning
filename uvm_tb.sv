@@ -337,24 +337,32 @@
 			function new(string name, uvm_component parent);
     			super.new(name, parent);
   			endfunction
-			uvm_analysis_port #(bus_seq_item) expected_port;
+			uvm_analysis_port #(GPIO_seq_item) expected_port;
 
 			function void build_phase(uvm_phase phase);
 				expected_port = new("expected_port", this);
 			endfunction  
 
 			function void write(input bus_seq_item t);
-				bus_seq_item expected_txn;
-				if($cast(expected_txn, t.clone())) `uvm_fatal("COW fatal", "Can't copy sequence item in predictor") //COPY ON WRITE
-
-			/*
-				case(t.opcode) //calculate and save expected results
+				//bus_seq_item expected_txn;
+				GPIO_seq_item expected_txn;
+				//if($cast(expected_txn, t.clone())) `uvm_fatal("COW fatal", "Can't copy sequence item in predictor") //COPY ON WRITE
+			
+				case(t.addr[7:0]) //calculate and save expected results
 				//here logic needed to represent the behaviour of the dut
-					ADD: expected_txn.result = t.a + t.b; 
-					SUB: expected_txn.result = t.a - t.b;
+						8'h00: begin expected_txn.gp_op_valid[0] = 1; expected_txn.gp_op[31 :0  ] = t.write_data; end
+			            8'h04: begin expected_txn.gp_op_valid[1] = 1; expected_txn.gp_op[63 :32 ] = t.write_data; end
+			            8'h08: begin expected_txn.gp_op_valid[2] = 1; expected_txn.gp_op[95 :64 ] = t.write_data; end
+			            8'h0c: begin expected_txn.gp_op_valid[3] = 1; expected_txn.gp_op[127:96 ] = t.write_data; end
+			            8'h10: begin expected_txn.gp_op_valid[4] = 1; expected_txn.gp_op[159:128] = t.write_data; end
+			            8'h14: begin expected_txn.gp_op_valid[5] = 1; expected_txn.gp_op[191:160] = t.write_data; end
+			            8'h18: begin expected_txn.gp_op_valid[6] = 1; expected_txn.gp_op[223:192] = t.write_data; end
+			            8'h1c: begin expected_txn.gp_op_valid[7] = 1; expected_txn.gp_op[255:224] = t.write_data; end
+					//ADD: expected_txn.result = t.a + t.b; 
+					//SUB: expected_txn.result = t.a - t.b;
 					//...
-				endcase // t.opcode
-				*/
+				endcase // t.addr
+				
 				expected_port.write(expected_txn); //send expected results to the evaluator
 			endfunction  
 		endclass : my_predictor	
