@@ -348,7 +348,7 @@
 				GPIO_seq_item expected_txn;
 				//if($cast(expected_txn, t.clone())) `uvm_fatal("COW fatal", "Can't copy sequence item in predictor") //COPY ON WRITE
 			
-				case(t.addr[7:0]) //calculate and save expected results
+				/*case(t.addr[7:0]) //calculate and save expected results
 				//here logic needed to represent the behaviour of the dut
 						8'h00: begin expected_txn.gp_op_valid[0] = 1; expected_txn.gp_op[31 :0  ] = t.write_data; end
 			            8'h04: begin expected_txn.gp_op_valid[1] = 1; expected_txn.gp_op[63 :32 ] = t.write_data; end
@@ -361,9 +361,9 @@
 					//ADD: expected_txn.result = t.a + t.b; 
 					//SUB: expected_txn.result = t.a - t.b;
 					//...
-				endcase // t.addr
+				endcase // t.addr*/
 				
-				expected_port.write(expected_txn); //send expected results to the evaluator
+				//expected_port.write(expected_txn); //send expected results to the evaluator
 			endfunction  
 		endclass : my_predictor	
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -590,7 +590,7 @@
 			      start_item(req);
 			      // The address is constrained to be within the address of the GPIO function
 			      // within the DUT, The result will be a request item for a read or a write
-			    assert(req.randomize() with {addr inside {[32'h0100_0000:32'h0100_001C]};});
+			    assert(req.randomize() with {addr inside {[32'h0100_0000:32'h0100_003C]};});
 				if(req.read_not_write == 1) begin
 				req.write_data = 'x;
 				end else begin
