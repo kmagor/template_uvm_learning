@@ -305,7 +305,7 @@
 				  forever begin
 				      @(posedge GPIO_agnt_vi.gp_op_valid);
 				    req = GPIO_seq_item::type_id::create ("req", this);
-				     if(GPIO_agnt_vi.gp_op_valid)  begin // is it a valid output?
+				      if(GPIO_agnt_vi.gp_op_valid)  begin // is it a valid output?
 				         req.gp_op = GPIO_agnt_vi.gp_op;  // get data   
 				         req.gp_ip = GPIO_agnt_vi.gp_ip;  // get data   					 
 				      end
@@ -347,23 +347,22 @@
 				//bus_seq_item expected_txn;
 				GPIO_seq_item expected_txn;
 				//if($cast(expected_txn, t.clone())) `uvm_fatal("COW fatal", "Can't copy sequence item in predictor") //COPY ON WRITE
-			
-				/*case(t.addr[7:0]) //calculate and save expected results
-				//here logic needed to represent the behaviour of the dut
-						8'h00: begin expected_txn.gp_op_valid[0] = 1; expected_txn.gp_op[31 :0  ] = t.write_data; end
-			            8'h04: begin expected_txn.gp_op_valid[1] = 1; expected_txn.gp_op[63 :32 ] = t.write_data; end
-			            8'h08: begin expected_txn.gp_op_valid[2] = 1; expected_txn.gp_op[95 :64 ] = t.write_data; end
-			            8'h0c: begin expected_txn.gp_op_valid[3] = 1; expected_txn.gp_op[127:96 ] = t.write_data; end
-			            8'h10: begin expected_txn.gp_op_valid[4] = 1; expected_txn.gp_op[159:128] = t.write_data; end
-			            8'h14: begin expected_txn.gp_op_valid[5] = 1; expected_txn.gp_op[191:160] = t.write_data; end
-			            8'h18: begin expected_txn.gp_op_valid[6] = 1; expected_txn.gp_op[223:192] = t.write_data; end
-			            8'h1c: begin expected_txn.gp_op_valid[7] = 1; expected_txn.gp_op[255:224] = t.write_data; end
-					//ADD: expected_txn.result = t.a + t.b; 
-					//SUB: expected_txn.result = t.a - t.b;
-					//...
-				endcase // t.addr*/
-				
-				//expected_port.write(expected_txn); //send expected results to the evaluator
+			  	if(t.read_not_write == 0) begin // Write
+				  	if(t.addr inside{[32'h0100_0000:32'h0100_001C]}) begin
+						case(t.addr[7:0]) //get and save expected results
+						//here logic needed to represent the behaviour of the dut
+								8'h00: begin expected_txn.gp_op_valid[0] = 1; expected_txn.gp_op[31 :0  ] = t.write_data; end
+					            8'h04: begin expected_txn.gp_op_valid[1] = 1; expected_txn.gp_op[63 :32 ] = t.write_data; end
+					            8'h08: begin expected_txn.gp_op_valid[2] = 1; expected_txn.gp_op[95 :64 ] = t.write_data; end
+					            8'h0c: begin expected_txn.gp_op_valid[3] = 1; expected_txn.gp_op[127:96 ] = t.write_data; end
+					            8'h10: begin expected_txn.gp_op_valid[4] = 1; expected_txn.gp_op[159:128] = t.write_data; end
+					            8'h14: begin expected_txn.gp_op_valid[5] = 1; expected_txn.gp_op[191:160] = t.write_data; end
+					            8'h18: begin expected_txn.gp_op_valid[6] = 1; expected_txn.gp_op[223:192] = t.write_data; end
+					            8'h1c: begin expected_txn.gp_op_valid[7] = 1; expected_txn.gp_op[255:224] = t.write_data; end
+						endcase // t.addr
+					end
+				end
+				expected_port.write(expected_txn); //send expected results to the evaluator
 			endfunction  
 		endclass : my_predictor	
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -396,9 +395,9 @@
 				actual_export.connect(actual_fifo.analysis_export);
 			endfunction
 
-			virtual task run_phase(uvm_phase phase);
-				GPIO_seq_item expected_txn, actual_txn;
+			virtual task run_phase(uvm_phase phase);				
 				forever begin
+					GPIO_seq_item expected_txn, actual_txn;
 					expected_fifo.get(expected_txn);
 					actual_fifo.get(actual_txn);
 					if(actual_txn.compare(expected_txn))
@@ -590,7 +589,7 @@
 			      start_item(req);
 			      // The address is constrained to be within the address of the GPIO function
 			      // within the DUT, The result will be a request item for a read or a write
-			    assert(req.randomize() with {addr inside {[32'h0100_0000:32'h0100_003C]};});
+			    assert(req.randomize() with {addr inside {[32'h0100_0000:32'h0100_001C]};});
 				if(req.read_not_write == 1) begin
 				req.write_data = 'x;
 				end else begin
