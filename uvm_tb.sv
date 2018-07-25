@@ -71,7 +71,7 @@
 			endfunction: do_compare
 
 			function string convert2string();
-			  return $sformatf("%s\n gp_op_valid:\t%0h\n gp_op:\t%0h\n gp_ip:\t%0b\n",
+			  return $sformatf("%s\n gp_op_valid:\t%0h\n gp_op:\t%256h\n gp_ip:\t%0b\n",
 			                    super.convert2string(), gp_op_valid, gp_op, gp_ip);
 			endfunction: convert2string
 
@@ -346,18 +346,23 @@
     			super.new(name, parent);
   			endfunction
 			GPIO_seq_item expected_txn;	
+		//	GPIO_seq_item expected_txn_cop;
 			uvm_analysis_port #(GPIO_seq_item) expected_port;
 			//bus_seq_item t;
 			//GPIO_seq_item expected_txn;
 			function void build_phase(uvm_phase phase);
 				expected_port = new("expected_port", this);
 				expected_txn = new("expected_txn");
-			endfunction  
-			
+				expected_txn.gp_op_valid[7:0] = 0;
+				expected_txn.gp_op[255:0] = 256'h0;
+			endfunction  			
 
 			function void write(input bus_seq_item t);
 				//expected_txn = GPIO_seq_item::type_id::create ("expected_txn", this);
-				//if($cast(expected_txn, t.clone())) `uvm_fatal("COW fatal", "Can't copy sequence item in predictor") //COPY ON WRITE
+				//if($cast(expected_txn_cop, expected_txn.clone())) `uvm_fatal("COW fatal", "Can't copy sequence item in predictor") //COPY ON WRITE
+				
+				expected_txn.gp_op_valid[7:0] = 0;
+			  	
 			  	if(t.read_not_write == 0) begin // Write
 				  	if(t.addr inside{[32'h0100_0000:32'h0100_001C]}) begin
 						case(t.addr[7:0]) //get and save expected results
@@ -372,10 +377,11 @@
 					            8'h1c: begin expected_txn.gp_op_valid[7] = 1; expected_txn.gp_op[255:224] = t.write_data; end
 						endcase // t.addr
 					end
-				end
-				expected_port.write(expected_txn); //send expected results to the evaluator
+				    expected_port.write(expected_txn); //send expected results to the evaluator
+				end				
+				
 			endfunction  
-		endclass : my_predictor	
+		endclass : my_predictor
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -409,10 +415,12 @@
 			virtual task run_phase(uvm_phase phase);				
 				forever begin
 					GPIO_seq_item expected_txn, actual_txn;
-					expected_fifo.get(expected_txn);
 					actual_fifo.get(actual_txn);
-					if(actual_txn.compare(expected_txn))
+					expected_fifo.get(expected_txn);
+					if(actual_txn.compare(expected_txn))begin
 						match++;
+						`uvm_info("Evaluator",$sformatf("%s EXPECTED above does /MATCH/ ACTUAL below %s",expected_txn.convert2string(), actual_txn.convert2string()), UVM_LOW)
+					end
 					else begin
 						`uvm_error("Evaluator", $sformatf("%s EXPECTED above does not match ACTUAL below %s",expected_txn.convert2string(), actual_txn.convert2string()))
 						mismatch++;
