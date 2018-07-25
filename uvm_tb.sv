@@ -314,7 +314,8 @@
 				      			GPIO_agnt_vi.gp_op_valid[7]);
 				      // is it a valid output?
 				         req.gp_op = GPIO_agnt_vi.gp_op;  // get data   
-				         req.gp_ip = GPIO_agnt_vi.gp_ip;  // get data   					 
+				         req.gp_ip = GPIO_agnt_vi.gp_ip;  // get data 
+				         req.gp_op_valid = GPIO_agnt_vi.gp_op_valid; //get data  					 
 				     
 				    $display("Following goes to analysis port FROM GPIO_momnitor:");
 					`uvm_info("GPIO monitor side", req.convert2string(), UVM_LOW);
@@ -356,8 +357,8 @@
 				GPIO_seq_item expected_txn;
 							expected_txn = GPIO_seq_item::type_id::create ("expected_txn", this);
 				//if($cast(expected_txn, t.clone())) `uvm_fatal("COW fatal", "Can't copy sequence item in predictor") //COPY ON WRITE
-			  	//if(t.read_not_write == 0) begin // Write
-				  //	if(t.addr inside{[32'h0100_0000:32'h0100_001C]}) begin
+			  	if(t.read_not_write == 0) begin // Write
+				  	if(t.addr inside{[32'h0100_0000:32'h0100_001C]}) begin
 						case(t.addr[7:0]) //get and save expected results
 						//here logic needed to represent the behaviour of the dut
 								8'h00: begin expected_txn.gp_op_valid[0] = 1; expected_txn.gp_op[31 :0  ] = t.write_data; end
@@ -369,8 +370,8 @@
 					            8'h18: begin expected_txn.gp_op_valid[6] = 1; expected_txn.gp_op[223:192] = t.write_data; end
 					            8'h1c: begin expected_txn.gp_op_valid[7] = 1; expected_txn.gp_op[255:224] = t.write_data; end
 						endcase // t.addr
-				//	end
-			//	end
+					end
+				end
 				expected_port.write(expected_txn); //send expected results to the evaluator
 			endfunction  
 		endclass : my_predictor	
