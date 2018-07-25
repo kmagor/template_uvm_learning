@@ -345,17 +345,18 @@
 			function new(string name, uvm_component parent);
     			super.new(name, parent);
   			endfunction
-
+			GPIO_seq_item expected_txn;	
 			uvm_analysis_port #(GPIO_seq_item) expected_port;
 			//bus_seq_item t;
 			//GPIO_seq_item expected_txn;
 			function void build_phase(uvm_phase phase);
 				expected_port = new("expected_port", this);
+				expected_txn = new("expected_txn");
 			endfunction  
+			
 
 			function void write(input bus_seq_item t);
-				GPIO_seq_item expected_txn;
-							expected_txn = GPIO_seq_item::type_id::create ("expected_txn", this);
+				//expected_txn = GPIO_seq_item::type_id::create ("expected_txn", this);
 				//if($cast(expected_txn, t.clone())) `uvm_fatal("COW fatal", "Can't copy sequence item in predictor") //COPY ON WRITE
 			  	if(t.read_not_write == 0) begin // Write
 				  	if(t.addr inside{[32'h0100_0000:32'h0100_001C]}) begin
